@@ -1,0 +1,263 @@
+# 🏦 BankApp — Application de gestion bancaire en ligne
+
+Application web fullstack pour la gestion bancaire en ligne, conçue comme un projet de fin d'études fintech moderne.
+
+**Stack** : Laravel 12 (API REST) · React 18 (SPA) · MySQL 8 · Sanctum · Tailwind CSS
+
+---
+
+## 📂 Structure du projet
+
+```
+bankapp/
+├── backend/            # Backend Laravel 12 (API REST)
+├── frontend/           # Frontend React 18 + Vite + Redux Toolkit
+└── README.md           # Vous êtes ici
+```
+
+---
+
+## 🚀 Installation
+
+### Prérequis
+- PHP ≥ 8.2 + Composer
+- Node.js ≥ 18 + npm
+- MySQL 8 (local — port 3306)
+- Git
+
+### Backend (Laravel)
+
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+
+# Créer la base `bankapp` dans MySQL puis configurer DB_* dans .env
+php artisan migrate --seed
+php artisan serve   # http://localhost:8000
+```
+
+### Frontend (React)
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev   # http://localhost:5173
+```
+
+### Comptes de démo
+
+| Rôle | Email | Mot de passe |
+|---|---|---|
+| Admin | `admin@bankapp.test` | `Admin@2026` |
+| Client | `client@bankapp.test` | `Client@2026` |
+
+---
+
+## 🧩 Fonctionnalités
+
+### Côté client
+- ✅ Inscription / Connexion sécurisées (Sanctum + rate limiting)
+- ✅ Dashboard avec KPIs et graphique 30 jours (Recharts)
+- ✅ Gestion multi-comptes (courant / épargne)
+- ✅ Dépôts / Retraits avec validation de solde et plafonds
+- ✅ Virements avec **workflow OTP par email + SMS** au-delà de 1000 MAD
+- ✅ Historique filtrable (type, compte, dates, recherche) + pagination
+- ✅ **Export PDF** des relevés (dompdf)
+- ✅ Édition profil + changement mot de passe
+- ✅ Dark mode complet
+- ✅ Responsive mobile / tablette / desktop
+
+### Côté admin
+- ✅ Dashboard statistiques (KPIs + graphes Recharts)
+- ✅ Gestion utilisateurs (suspendre / réactiver)
+- ✅ Gestion comptes (bloquer avec motif / activer)
+- ✅ Stats avancées (volume, count, répartition par type)
+- ✅ **Journal d'audit** complet et immuable (qui, quoi, quand, où — IP, user-agent)
+
+---
+
+## 🔐 Garanties de sécurité bancaire
+
+| Garantie | Implémentation |
+|---|---|
+| Atomicité opérations | `DB::transaction` autour de chaque débit/crédit |
+| Anti race-condition | `lockForUpdate()` sur les comptes (ordre id asc → pas de deadlock) |
+| Précision décimale | `DECIMAL(15,2)` + `bcadd`/`bcsub`/`bccomp` — jamais de `float` |
+| Immuabilité historique | Modèle `Transaction` bloque `update`/`delete` via `booted()` |
+| OTP fort | Hashé en BDD, 5 min TTL, max 5 tentatives, invalidation des précédents |
+| Brute-force login | `RateLimiter` (5 tentatives / min / IP) |
+| Mots de passe | bcrypt 12 rounds + politique forte (maj, min, chiffre, symbole, ≥8) |
+| Validation côté serveur | `FormRequest` partout, jamais de confiance au client |
+| Validation côté client | `react-hook-form` + `zod` (typage) |
+| CORS strict | Whitelist `FRONTEND_URL` + `supports_credentials` |
+| Audit complet | `audit_logs` polymorphique (IP, user-agent, snapshots) |
+| Autorisation | `AccountPolicy` + middleware `role:admin` + ownership check |
+| Tokens révocables | Sanctum `currentAccessToken()->delete()` au logout |
+| Révocation cascadée | Changement mot de passe → révoque tous les autres tokens |
+| Soft validation IBAN | Regex serveur `BK\d{18,}` |
+
+---
+
+## 🧪 Tests
+
+```bash
+cd backend
+php artisan test
+```
+
+Couverture : invariants critiques du `TransactionService` (atomicité, fonds insuffisants, compte bloqué, immuabilité), flux d'auth complet.
+
+---
+
+## 📚 Architecture
+
+### Backend (Laravel)
+- **Pattern Service Layer** : controllers thin → services business → models
+- **Repositories implicites** : Eloquent + scopes (`active()`, `ownedBy()`, `forAccount()`)
+- **Enums PHP 8.1+** typés partout (statuts, rôles, types)
+- **Resources** pour la sérialisation API
+- **Form Requests** pour la validation
+- **Policies** pour l'autorisation fine
+
+### Frontend (React)
+- **Redux Toolkit + RTK Query** : cache HTTP auto + invalidation par tags
+- **Axios partagé** : token Sanctum auto + 401 → redirect login
+- **Routing protégé** : `ProtectedRoute` + `RoleRoute` (admin)
+- **Lazy loading** des pages client/admin
+- **Context** dark mode + persistance localStorage
+- **React Hook Form + Zod** pour les formulaires
+- **Recharts** pour la dataviz
+
+### Modèle de données
+
+```
+users (1) ─── (*) accounts (1) ─── (*) transactions
+  │                                       │ (source / target)
+  ├─── (*) otp_codes                     │
+  └─── (*) audit_logs (polymorphic)      │
+                                          │
+                              transactions est APPEND-ONLY
+                              (immuable : pas d'UPDATE/DELETE possible)
+```
+
+---
+
+## 📦 Déploiement production
+
+### Variables d'environnement à changer impérativement
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=<générer avec key:generate>
+APP_URL=https://api.votredomaine.com
+FRONTEND_URL=https://app.votredomaine.com
+
+# DB : credentials forts
+# MAIL : SMTP réel (SendGrid, Mailgun, SES...)
+# TWILIO : credentials prod
+SESSION_DOMAIN=.votredomaine.com
+SANCTUM_STATEFUL_DOMAINS=app.votredomaine.com
+```
+
+### Checklist sécurité avant mise en prod
+
+- [ ] HTTPS obligatoire (HSTS, cookies `secure`)
+- [ ] `APP_DEBUG=false`
+- [ ] Logs structurés (Sentry / Bugsnag)
+- [ ] Backup BDD automatisé (au moins quotidien)
+- [ ] Migration `php artisan migrate --force --pretend` validée avant prod
+- [ ] Queue worker en supervisor (mails + SMS asynchrones)
+- [ ] SMTP réel configuré (MAIL_MAILER=smtp avec provider)
+- [ ] Rate limiting nginx en amont aussi
+- [ ] CORS restreint au domaine prod uniquement
+- [ ] `BCRYPT_ROUNDS=12` minimum
+- [ ] Rotation des tokens Sanctum (option : expiration)
+- [ ] Monitoring (uptime, latence, taux d'erreurs)
+- [ ] Pentest avant ouverture publique
+
+---
+
+## 🗂️ Documentation des routes API
+
+Toutes les routes sont préfixées `/api/v1`. Voir [backend/routes/api.php](backend/routes/api.php) pour la liste complète.
+
+### Authentification
+```
+POST   /auth/register
+POST   /auth/login
+POST   /auth/logout              [auth]
+GET    /auth/me                  [auth]
+PUT    /auth/profile             [auth]
+PUT    /auth/password            [auth]
+```
+
+### OTP
+```
+POST   /otp/send                 [auth, throttle:3,1]
+POST   /otp/verify               [auth]
+```
+
+### Comptes
+```
+GET    /accounts                 [auth]
+POST   /accounts                 [auth]
+GET    /accounts/{id}            [auth, can:view]
+GET    /accounts/{id}/balance    [auth, can:view]
+```
+
+### Transactions
+```
+GET    /transactions             [auth]   ?account_id&type&from&to&search&page
+GET    /transactions/{id}        [auth]
+GET    /transactions/export/pdf  [auth]
+POST   /transactions/deposit            [auth, can:transact]
+POST   /transactions/withdraw           [auth, can:transact]
+POST   /transactions/transfer/initiate  [auth, can:transact]   → OTP si ≥ 1000 MAD
+POST   /transactions/transfer/confirm   [auth, can:transact]
+```
+
+### Admin
+```
+GET    /admin/users                       [auth, role:admin]
+GET    /admin/users/{id}                  [auth, role:admin]
+PATCH  /admin/users/{id}/status           [auth, role:admin]
+GET    /admin/accounts                    [auth, role:admin]
+PATCH  /admin/accounts/{id}/block         [auth, role:admin]
+PATCH  /admin/accounts/{id}/activate      [auth, role:admin]
+GET    /admin/stats/overview              [auth, role:admin]
+GET    /admin/audit-logs                  [auth, role:admin]
+```
+
+---
+
+## 📖 Documentation phases
+
+Le projet a été livré en 7 phases :
+
+| Phase | Contenu |
+|---|---|
+| 1 | Architecture, schéma BDD, diagrammes UML |
+| 2 | Migrations, modèles, factories, seeders, enums |
+| 3 | Services métier (TransactionService avec locks), controllers, routes, policies, tests Pest |
+| 4 | Scaffold React, store Redux, RTK Query, auth, layouts, dark mode, pages publiques |
+| 5 | Pages client complètes (dashboard, comptes, virement OTP, historique, export PDF, profil) |
+| 6 | Pages admin (dashboard stats, users, accounts, audit logs) |
+| 7 | Guide d'installation, checklist sécurité |
+
+---
+
+## 🤝 Crédits
+
+Projet pédagogique fintech — Laravel + React + MySQL.
+
+Inspirations : architecture banking standards (transactions atomiques, audit, immutabilité).
+
+---
+
+## 📄 Licence
+
+Projet éducatif — libre de réutilisation pour l'apprentissage.
