@@ -138,39 +138,3 @@ users (1) ─── (*) accounts (1) ─── (*) transactions
                               (immuable : pas d'UPDATE/DELETE possible)
 ```
 
----
-
-## 📦 Déploiement production
-
-### Variables d'environnement à changer impérativement
-
-```env
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=<générer avec key:generate>
-APP_URL=https://api.votredomaine.com
-FRONTEND_URL=https://app.votredomaine.com
-
-# DB : credentials forts
-# MAIL : SMTP réel (SendGrid, Mailgun, SES...)
-# TWILIO : credentials prod
-SESSION_DOMAIN=.votredomaine.com
-SANCTUM_STATEFUL_DOMAINS=app.votredomaine.com
-```
-
-### Checklist sécurité avant mise en prod
-
-- [ ] HTTPS obligatoire (HSTS, cookies `secure`)
-- [ ] `APP_DEBUG=false`
-- [ ] Logs structurés (Sentry / Bugsnag)
-- [ ] Backup BDD automatisé (au moins quotidien)
-- [ ] Migration `php artisan migrate --force --pretend` validée avant prod
-- [ ] Queue worker en supervisor (mails + SMS asynchrones)
-- [ ] SMTP réel configuré (MAIL_MAILER=smtp avec provider)
-- [ ] Rate limiting nginx en amont aussi
-- [ ] CORS restreint au domaine prod uniquement
-- [ ] `BCRYPT_ROUNDS=12` minimum
-- [ ] Rotation des tokens Sanctum (option : expiration)
-- [ ] Monitoring (uptime, latence, taux d'erreurs)
-- [ ] Pentest avant ouverture publique
-
